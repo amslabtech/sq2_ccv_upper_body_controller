@@ -124,7 +124,7 @@ namespace sq2_ccv_upper_body_controller{
   {
   }
 
-  bool SQ2CCVUpperBodyController::init(hardware_interface::PositionJointInterface* hw,
+  bool SQ2CCVUpperBodyController::init(hardware_interface::EffortJointInterface* hw,
             ros::NodeHandle& root_nh,
             ros::NodeHandle &controller_nh)
   {
@@ -177,11 +177,18 @@ namespace sq2_ccv_upper_body_controller{
 
     sub_command_ = controller_nh.subscribe("roll_pitch", 1, &SQ2CCVUpperBodyController::cmdCallback, this);
 
+	controller_nh.getParam("p", p);
+	controller_nh.getParam("i", i);
+	controller_nh.getParam("d", d);
+	pid_controller_.setGains(p,i,d,10.0,0.0);
+
     return true;
   }
 
   void SQ2CCVUpperBodyController::update(const ros::Time& time, const ros::Duration& period)
   {
+	printf("\r roll = %f", roll_joints_[0].getPosition());
+
     Commands curr_cmd = *(command_.readFromRT());
 	double roll_angle = curr_cmd.roll;
 	if(roll_angle > M_PI / 2.0){
@@ -191,7 +198,9 @@ namespace sq2_ccv_upper_body_controller{
 	}
 	for(size_t i=0;i<roll_joints_size;i++){
 		double angle = roll_angle * (roll_axes_reversed_[i] ? -1 : 1);
-		roll_joints_[i].setCommand(angle);
+		double roll_error = angle - roll_joints_[i].getPosition();
+		double effort_roll =  pid_controller_.computeCommand(roll_error, period);
+		roll_joints_[i].setCommand(effort_roll);
 	}
 
 	double pitch_angle = curr_cmd.pitch;
@@ -202,7 +211,9 @@ namespace sq2_ccv_upper_body_controller{
 	}
 	for(size_t i=0;i<pitch_joints_size;i++){
 		double angle = pitch_angle * (pitch_axes_reversed_[i] ? -1 : 1);
-		pitch_joints_[i].setCommand(angle);
+		double pitch_error = angle - pitch_joints_[i].getPosition();
+		double effort_pitch = pid_controller_.computeCommand(pitch_error, period);
+		pitch_joints_[i].setCommand(effort_pitch);
 	}
   }
 

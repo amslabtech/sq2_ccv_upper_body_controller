@@ -43,6 +43,7 @@
 #include <realtime_tools/realtime_buffer.h>
 #include <realtime_tools/realtime_publisher.h>
 #include <tf/tfMessage.h>
+#include <control_toolbox/pid.h>
 
 #include "sq2_ccv_roll_pitch_msgs/RollPitch.h"
 
@@ -58,7 +59,7 @@ namespace sq2_ccv_upper_body_controller{
    *  - a wheel joint frame center's vertical projection on the floor must lie within the contact patch
    */
   class SQ2CCVUpperBodyController
-      : public controller_interface::Controller<hardware_interface::PositionJointInterface>
+      : public controller_interface::Controller<hardware_interface::EffortJointInterface>
   {
   public:
     SQ2CCVUpperBodyController();
@@ -69,7 +70,7 @@ namespace sq2_ccv_upper_body_controller{
      * \param root_nh       Node handle at root namespace
      * \param controller_nh Node handle inside the controller namespace
      */
-    bool init(hardware_interface::PositionJointInterface* hw,
+    bool init(hardware_interface::EffortJointInterface* hw,
               ros::NodeHandle& root_nh,
               ros::NodeHandle &controller_nh);
     /**
@@ -120,6 +121,9 @@ namespace sq2_ccv_upper_body_controller{
     realtime_tools::RealtimeBuffer<Commands> command_;
 
   private:
+
+	control_toolbox::Pid pid_controller_;
+	float p, i, d;
     /**
      * \brief Brakes the wheels, i.e. sets the velocity to 0
      */
