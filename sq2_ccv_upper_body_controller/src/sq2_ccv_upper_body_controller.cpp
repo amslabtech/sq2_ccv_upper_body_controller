@@ -180,14 +180,14 @@ namespace sq2_ccv_upper_body_controller{
 	controller_nh.getParam("p", p);
 	controller_nh.getParam("i", i);
 	controller_nh.getParam("d", d);
-	pid_controller_.setGains(p,i,d,10.0,0.0);
+	controller_nh.getParam("i_clamp", i_clamp);
+	pid_controller_.setGains(p,i,d,i_clamp,-i_clamp);
 
     return true;
   }
 
   void SQ2CCVUpperBodyController::update(const ros::Time& time, const ros::Duration& period)
   {
-	printf("\r roll = %f", roll_joints_[0].getPosition());
 
     Commands curr_cmd = *(command_.readFromRT());
 	double roll_angle = curr_cmd.roll;

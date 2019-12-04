@@ -123,7 +123,7 @@ namespace sq2_ccv_upper_body_controller{
   private:
 
 	control_toolbox::Pid pid_controller_;
-	float p, i, d;
+	float p, i, d, i_clamp;
     /**
      * \brief Brakes the wheels, i.e. sets the velocity to 0
      */
