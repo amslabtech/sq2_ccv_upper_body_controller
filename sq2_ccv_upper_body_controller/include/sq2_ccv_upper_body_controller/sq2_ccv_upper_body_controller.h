@@ -35,6 +35,7 @@
 #include <control_msgs/JointTrajectoryControllerState.h>
 #include <controller_interface/controller.h>
 #include <controller_interface/multi_interface_controller.h>
+#include <control_toolbox/pid.h>
 #include <geometry_msgs/TwistStamped.h>
 #include <hardware_interface/joint_command_interface.h>
 #include <memory>
@@ -43,6 +44,7 @@
 #include <realtime_tools/realtime_buffer.h>
 #include <realtime_tools/realtime_publisher.h>
 #include <tf/tfMessage.h>
+#include <unordered_map>
 
 #include "sq2_ccv_roll_pitch_msgs/RollPitch.h"
 
@@ -58,18 +60,18 @@ namespace sq2_ccv_upper_body_controller{
    *  - a wheel joint frame center's vertical projection on the floor must lie within the contact patch
    */
   class SQ2CCVUpperBodyController
-      : public controller_interface::Controller<hardware_interface::PositionJointInterface>
+      : public controller_interface::Controller<hardware_interface::EffortJointInterface>
   {
   public:
     SQ2CCVUpperBodyController();
 
     /**
      * \brief Initialize controller
-     * \param hw            Velocity position 
+     * \param hw            Velocity position
      * \param root_nh       Node handle at root namespace
      * \param controller_nh Node handle inside the controller namespace
      */
-    bool init(hardware_interface::PositionJointInterface* hw,
+    bool init(hardware_interface::EffortJointInterface* hw,
               ros::NodeHandle& root_nh,
               ros::NodeHandle &controller_nh);
     /**
@@ -118,6 +120,9 @@ namespace sq2_ccv_upper_body_controller{
       Commands() : roll(0.0), pitch(0.0), stamp(0.0) {}
     };
     realtime_tools::RealtimeBuffer<Commands> command_;
+
+    std::vector<control_toolbox::Pid> roll_pid_controllers_;
+    std::vector<control_toolbox::Pid> pitch_pid_controllers_;
 
   private:
     /**
