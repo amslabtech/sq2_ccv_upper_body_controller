@@ -48,7 +48,7 @@ static double euclideanOfVectors(const urdf::Vector3& vec1, const urdf::Vector3&
 /*
 * \brief Check that a link exists and has a geometry collision.
 * \param link The link
-* \return true if the link has a collision element with geometry 
+* \return true if the link has a collision element with geometry
 */
 static bool hasCollisionGeometry(const urdf::LinkConstSharedPtr& link)
 {
@@ -124,7 +124,7 @@ namespace sq2_ccv_upper_body_controller{
   {
   }
 
-  bool SQ2CCVUpperBodyController::init(hardware_interface::PositionJointInterface* hw,
+  bool SQ2CCVUpperBodyController::init(hardware_interface::EffortJointInterface* hw,
             ros::NodeHandle& root_nh,
             ros::NodeHandle &controller_nh)
   {
@@ -139,7 +139,7 @@ namespace sq2_ccv_upper_body_controller{
 	getJointNames(controller_nh, "pitch_joint", pitch_joint_names);
 	getAxesReverseds(controller_nh, "roll_axis_reversed", roll_axes_reversed_);
 	getAxesReverseds(controller_nh, "pitch_axis_reversed", pitch_axes_reversed_);
-    
+
 	if(roll_joint_names.size() > 0 && pitch_joint_names.size() > 0){
         roll_joints_size = roll_joint_names.size();
         pitch_joints_size = pitch_joint_names.size();
@@ -175,6 +175,24 @@ namespace sq2_ccv_upper_body_controller{
 		pitch_joints_[i] = hw->getHandle(pitch_joint_names[i]);
 	}
 
+    // PID
+    roll_pid_controllers_.resize(roll_joints_size);
+    for (size_t i = 0; i< roll_joints_size; i++)
+    {
+      if (!roll_pid_controllers_[i].init(ros::NodeHandle(controller_nh, "pid/" + roll_joint_names[i])))
+      {
+        return false;
+      }
+    }
+    pitch_pid_controllers_.resize(pitch_joints_size);
+    for (size_t i = 0; i< pitch_joints_size; i++)
+    {
+      if (!pitch_pid_controllers_[i].init(ros::NodeHandle(controller_nh, "pid/" + pitch_joint_names[i])))
+      {
+        return false;
+      }
+    }
+
     sub_command_ = controller_nh.subscribe("roll_pitch", 1, &SQ2CCVUpperBodyController::cmdCallback, this);
 
     return true;
@@ -190,9 +208,12 @@ namespace sq2_ccv_upper_body_controller{
 		roll_angle += M_PI;
 	}
 	for(size_t i=0;i<roll_joints_size;i++){
-		double angle = roll_angle * (roll_axes_reversed_[i] ? -1 : 1);
-		roll_joints_[i].setCommand(angle);
-	}
+		const double angle = roll_angle * (roll_axes_reversed_[i] ? -1 : 1);
+    const double current_angle = roll_joints_[i].getPosition();
+    const double error = angle - current_angle;
+    const double command = roll_pid_controllers_[i].computeCommand(error, period);
+		roll_joints_[i].setCommand(command);
+  }
 
 	double pitch_angle = curr_cmd.pitch;
 	if(pitch_angle > M_PI / 2.0){
@@ -201,19 +222,38 @@ namespace sq2_ccv_upper_body_controller{
 		pitch_angle += M_PI;
 	}
 	for(size_t i=0;i<pitch_joints_size;i++){
-		double angle = pitch_angle * (pitch_axes_reversed_[i] ? -1 : 1);
-		pitch_joints_[i].setCommand(angle);
+		const double angle = pitch_angle * (pitch_axes_reversed_[i] ? -1 : 1);
+    const double current_angle = pitch_joints_[i].getPosition();
+    const double error = angle - current_angle;
+    const double command = pitch_pid_controllers_[i].computeCommand(error, period);
+    pitch_joints_[i].setCommand(command);
 	}
   }
 
   void SQ2CCVUpperBodyController::starting(const ros::Time& time)
   {
     brake();
+    for (auto& c : roll_pid_controllers_)
+    {
+      c.reset();
+    }
+    for (auto& c : pitch_pid_controllers_)
+    {
+      c.reset();
+    }
   }
 
   void SQ2CCVUpperBodyController::stopping(const ros::Time& /*time*/)
   {
     brake();
+    for (auto& c : roll_pid_controllers_)
+    {
+      c.reset();
+    }
+    for (auto& c : pitch_pid_controllers_)
+    {
+      c.reset();
+    }
   }
 
   void SQ2CCVUpperBodyController::brake()
